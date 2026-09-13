@@ -61,6 +61,17 @@ PLATFORM_PATTERNS = [
 MAX_VIDEO_FORMATS = 14
 MAX_AUDIO_FORMATS = 6
 
+_STANDARD_HEIGHTS = [4320, 2160, 1440, 1080, 720, 480, 360, 240, 144]
+
+
+def _quality_tier(height, width):
+    """按 YouTube 口径换算清晰度档位：超宽幅视频（如 3840×1920）以 16:9
+    等效高度命名（=2160p/4K），而不是真实像素高度 1920。"""
+    if not height and not width:
+        return None
+    effective = max(height or 0, round((width or 0) * 9 / 16))
+    return min(_STANDARD_HEIGHTS, key=lambda s: abs(s - effective))
+
 _tasks: dict[str, dict] = {}
 _lock = threading.Lock()
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="grab")
@@ -98,6 +109,7 @@ def _normalize_formats(info: dict) -> list[dict]:
                 "kind": "video",
                 "ext": f.get("ext"),
                 "height": height,
+                "tier": _quality_tier(height, f.get("width")),
                 "fps": fps,
                 "vcodec": (vcodec or "").split(".")[0],
                 "acodec": (acodec or "none").split(".")[0],

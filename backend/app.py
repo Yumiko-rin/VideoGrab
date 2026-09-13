@@ -3,6 +3,7 @@
 启动：uvicorn backend.app:app --host 127.0.0.1 --port 8100
 """
 import asyncio
+import os
 import re
 from pathlib import Path
 
@@ -108,10 +109,20 @@ async def api_files():
 async def api_file(name: str):
     # 只允许访问 downloads 目录内的文件，路径穿越防护
     safe = Path(name).name
-    path = DOWNLOAD_DIR / safe
+    path = Path(DOWNLOAD_DIR) / safe
     if not path.is_file():
         raise HTTPException(status_code=404, detail="文件不存在")
     return FileResponse(path, filename=safe)
+
+
+@app.post("/api/open-folder")
+async def api_open_folder():
+    """在系统资源管理器中打开下载目录（本工具面向本机使用）。"""
+    try:
+        os.startfile(DOWNLOAD_DIR)  # noqa: S606 - Windows 资源管理器打开目录
+    except (OSError, AttributeError) as exc:
+        raise HTTPException(status_code=500, detail=f"无法打开文件夹：{exc}") from None
+    return {"ok": True}
 
 
 def _clean_error(raw: str) -> str:

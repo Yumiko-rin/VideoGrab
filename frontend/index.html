@@ -344,6 +344,16 @@ body {
 
 .section-title svg { color: var(--color-accent); }
 
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.section-head .section-title { margin: 0; }
+
 .card {
   border-radius: var(--radius-lg);
 }
@@ -964,10 +974,16 @@ button.text-link { width: auto; }
 
   <!-- 已完成 -->
   <section class="section hidden" id="filesSection" aria-label="已完成的下载">
-    <h2 class="section-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
-      已完成
-    </h2>
+    <div class="section-head">
+      <h2 class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        已完成
+      </h2>
+      <button class="text-link" id="openFolderBtn" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        打开下载文件夹
+      </button>
+    </div>
     <div class="file-list" id="fileList"></div>
   </section>
 </main>
@@ -1226,7 +1242,8 @@ $("#tabAudio").addEventListener("click", () => setTab("audio"));
 
 function qualityLabel(f) {
   if (f.kind === "audio") return f.abr ? `${f.abr}kbps` : (f.ext || "音频").toUpperCase();
-  return f.height ? `${f.height}p` : "未知";
+  const tier = f.tier || f.height;
+  return tier ? `${tier}p` : "未知";
 }
 
 function renderFormats() {
@@ -1269,6 +1286,12 @@ function renderFormats() {
     const q = document.createElement("span");
     q.className = "fmt-quality";
     q.textContent = qualityLabel(f);
+    if (f.kind === "video" && (f.tier || f.height) >= 2160) {
+      const uhd = document.createElement("span");
+      uhd.className = "fmt-fps";
+      uhd.textContent = "4K";
+      q.append(uhd);
+    }
     if (f.kind === "video" && f.fps >= 50) {
       const fps = document.createElement("span");
       fps.className = "fmt-fps";
@@ -1308,11 +1331,12 @@ function renderFormats() {
     // 第三列：大小 + 选中标记
     const sizeWrap = document.createElement("span");
     sizeWrap.className = "fmt-size";
+    // 体积未知（如 HLS 流）时不做合并估算，避免拿音频体积冒充总大小
     let total = f.filesize;
-    if (f.kind === "video" && f.progressive === false && info.ffmpeg && bestAudio) {
-      total = (f.filesize || 0) + (bestAudio.filesize || 0) || null;
+    if (f.kind === "video" && f.progressive === false && info.ffmpeg && bestAudio && f.filesize) {
+      total = f.filesize + (bestAudio.filesize || 0);
     }
-    sizeWrap.textContent = total ? `≈ ${formatBytes(total)}` : "未知大小";
+    sizeWrap.textContent = total ? `≈ ${formatBytes(total)}` : "大小未知";
     if (f.format_id === state.selectedId) {
       sizeWrap.append(svgEl(ICONS.check, 15));
       sizeWrap.style.display = "inline-flex";
@@ -1538,6 +1562,13 @@ async function loadFiles() {
 }
 
 /* ================= 初始化 ================= */
+$("#openFolderBtn").addEventListener("click", async () => {
+  try {
+    const res = await fetch("/api/open-folder", { method: "POST" });
+    if (!res.ok) throw new Error();
+  } catch { showToast("无法打开下载文件夹"); }
+});
+
 loadFiles();
 </script>
 </body>
