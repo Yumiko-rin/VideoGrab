@@ -32,8 +32,10 @@
 | Bilibili（含 b23.tv） | ✅ | yt-dlp + 官方 `finger/spi` 接口自举 buvid3/buvid4 指纹 cookie，预防 412 风控 |
 | YouTube（含 youtu.be） | ✅ | yt-dlp + 自动探测 node/deno 解签名挑战；风控时自动轮换 tv / ios / android_vr 客户端 |
 | 抖音（含 v.douyin.com 短链） | ✅ | Playwright 无头 Chromium 自举匿名会话 cookie（ttwid + s_v_web_id，**无需登录**），yt-dlp 携带后解析下载；cookie 缓存 2 小时自动刷新 |
-| 小红书（含 xhslink.com） | ✅ 视频笔记 / 图集 | 专用引擎直连笔记页解析 `__INITIAL_STATE__`（兼容非标准 `undefined` JSON、保留 `xsec_token`），图集自动打包 zip |
-| TikTok / X (Twitter) / 微博 / 快手 / 西瓜视频 等 | 视站点风控而定 | yt-dlp 通用引擎（支持 1000+ 站点），个别站点被风控时按 [Cookies 配置](#cookies-配置) 处理 |
+| 小红书（含 xhslink.com） | ✅ 视频笔记 / 图集 | 专用引擎直连笔记页解析 `__INITIAL_STATE__`（兼容非标准 `undefined` JSON、保留 `xsec_token`），图集自动打包 zip；私密/需登录笔记请配置 cookies.txt |
+| 快手 | ✅ | 专用引擎：Playwright 打开作品页拦截 `visionVideoDetail` GraphQL（页面风控脚本自动签发 token，API 直连会被验证码拦截），存无水印原画 |
+| 微博 | ✅ | yt-dlp `m.weibo.cn/detail/<id>` 直连解析 |
+| TikTok / X (Twitter) / Instagram | ⚠️ 需网络条件 | 国内网络直连不通：设置 `VIDEOGRAB_PROXY=http://127.0.0.1:7890` 走代理；X 的媒体多数需登录态，配合 cookies.txt 使用 |
 | 其他任意 yt-dlp 支持的站点 | 尽力而为 | 同上，欢迎提 issue 反馈 |
 
 > 站点风控策略随时会变，遇到新的拦截方式请提 issue，附上 `GET /api/health` 的返回。
@@ -115,6 +117,7 @@ videograb/
 | 格式归一化 | 按「分辨率×扩展名」去重取最高码率；21:9 宽幅按 YouTube 口径换算档位（3840×1920 → 2160p 4K） |
 | 任务管理 | 线程池并发 + progress_hooks 实时上报 + 钩子内抛错实现取消；HLS 总大小未知时显示不定进度 |
 | 安全与健壮 | 路径穿越防护、URL/文案校验、yt-dlp 报错清洗为用户可读文案、半成品文件清理 |
+| 出海站点代理 | 环境变量 `VIDEOGRAB_PROXY` 全局生效（TikTok / X / Instagram 等国内网络不可直连） |
 
 ## 免责声明
 
@@ -124,4 +127,4 @@ videograb/
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — 核心解析与下载引擎
 - [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) — 前端设计系统检索
-- 同类开源项目的设计思路参考：[RuiC-VideoGrab](https://github.com/HRuiCcc/RuiC-VideoGrab)、[TikTokDownload](https://github.com/JoeanAmier/TikTokDownload)、[XHS-Downloader](https://github.com/JoeanAmier/XHS-Downloader)、[MediaCrawler](https://github.com/NanmiCoder/MediaCrawler)
+- 同类开源项目的设计思路参考：[RuiC-VideoGrab](https://github.com/HRuiCcc/RuiC-VideoGrab)、[TikTokDownload](https://github.com/JoeanAmier/TikTokDownload)、[XHS-Downloader](https://github.com/JoeanAmier/XHS-Downloader)、[KS-Downloader](https://github.com/JoeanAmier/KS-Downloader)、[MediaCrawler](https://github.com/NanmiCoder/MediaCrawler)

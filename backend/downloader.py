@@ -31,6 +31,9 @@ def _detect_js_runtime() -> dict:
 
 JS_RUNTIMES = _detect_js_runtime()
 
+# 出海站点（TikTok / X / Instagram）在国内网络需要代理：VIDEOGRAB_PROXY=http://127.0.0.1:7890
+PROXY = os.environ.get("VIDEOGRAB_PROXY", "").strip() or None
+
 # YouTube 机器人验证是间歇性的（依赖当次请求指纹），轮换播放器客户端可显著提高通过率
 _BOT_CHECK_MARKER = "Sign in to confirm"
 _YT_CLIENT_FALLBACKS = [
@@ -344,6 +347,152 @@ def _run_xhs_direct(task: dict, url: str):
         task["ended_at"] = time.time()
 
 
+# ---------- 快手：Playwright 拦截作品 GraphQL（参考 KS-Downloader，真内核过风控） ----------
+
+_KS_HOST_RE = re.compile(r"kuaishou\.com|gifshow\.com", re.IGNORECASE)
+
+
+def is_kuaishou_url(url: str) -> bool:
+    return bool(_KS_HOST_RE.search(url))
+
+
+def _ks_fetch_photo(url: str) -> dict:
+    """Playwright 打开作品页，拦截页面自身发出的 visionVideoDetail GraphQL 响应。
+    快手 GraphQL 有风控 token 校验（脚本签发），只有真实浏览器环境能通过——
+    API 直连（含 curl_cffi TLS 伪装）会被要求验证码。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise yt_dlp.utils.DownloadError(
+            "快手解析需要 Playwright：pip install playwright && playwright install chromium") from None
+
+    result: dict = {}
+
+    def _on_response(resp):
+        try:
+            if resp.request.method == "POST" and "graphql" in resp.url:
+                body = resp.json()
+                detail = (body.get("data") or {}).get("visionVideoDetail") or {}
+                photo = detail.get("photo")
+                if isinstance(photo, dict) and photo.get("photoUrl"):
+                    result.setdefault("photo", photo)
+        except Exception:
+            pass
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=[
+                "--disable-blink-features=AutomationControlled", "--no-sandbox"])
+            try:
+                ctx = browser.new_context(
+                    user_agent=DOUYIN_UA,
+                    viewport={"width": 1280, "height": 800},
+                    locale="zh-CN")
+                page = ctx.new_page()
+                page.on("response", _on_response)
+                page.goto(url, wait_until="domcontentloaded", timeout=40000)
+                page.wait_for_timeout(8000)
+            finally:
+                browser.close()
+    except yt_dlp.utils.DownloadError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise yt_dlp.utils.DownloadError(f"快手解析失败：{str(exc)[:120]}") from exc
+
+    photo = result.get("photo")
+    if not photo:
+        raise yt_dlp.utils.DownloadError("未能从快手页面获取作品数据（可能触发验证码风控，请稍后重试）")
+
+    photo_url = photo.get("photoUrl")
+    if isinstance(photo_url, list):
+        photo_url = photo_url[0] if photo_url else None
+    if not photo_url:
+        raise yt_dlp.utils.DownloadError("作品没有可下载的视频地址（可能需要登录）")
+    author = photo.get("author") or {}
+    return {
+        "title": (photo.get("caption") or "").strip() or "快手作品",
+        "uploader": (author.get("name") or "") if isinstance(author, dict) else "",
+        "duration": (photo.get("duration") or 0) / 1000 or None,
+        "thumbnail": photo.get("coverUrl") if isinstance(photo.get("coverUrl"), str) else None,
+        "video_url": photo_url,
+        "filesize": None,
+        "webpage_url": url,
+        "ext": "mp4",
+    }
+
+
+def _ks_parse(url: str) -> dict:
+    photo = _ks_fetch_photo(url)
+    return {
+        "title": photo["title"],
+        "thumbnail": photo["thumbnail"],
+        "duration": photo["duration"],
+        "uploader": photo["uploader"],
+        "webpage_url": photo["webpage_url"],
+        "platform": "快手",
+        "extractor": "Kuaishou",
+        "formats": [{
+            "format_id": "ks-nowm",
+            "kind": "video",
+            "ext": photo["ext"],
+            "height": 0,
+            "tier": None,
+            "fps": 0,
+            "vcodec": "avc1",
+            "acodec": "mp4a",
+            "tbr": 0,
+            "filesize": photo["filesize"],
+            "progressive": True,
+        }],
+        "ffmpeg": FFMPEG_AVAILABLE,
+    }
+
+
+def _run_ks_direct(task: dict, url: str):
+    """快手直链下载：photoUrl 带时效与防盗链，任务开始时重新解析。"""
+    import urllib.request
+
+    path = None
+    try:
+        photo = _ks_fetch_photo(url)
+        safe_title = re.sub(r'[\\/:*?"<>|]', "_", photo["title"]).strip() or "快手作品"
+        path = os.path.join(DOWNLOAD_DIR, f"{safe_title}.mp4")
+        req = urllib.request.Request(photo["video_url"], headers={
+            "User-Agent": DOUYIN_UA, "Referer": "https://www.kuaishou.com/"})
+        started = time.time()
+        done = 0
+        with urllib.request.urlopen(req, timeout=60) as resp, open(path, "wb") as fh:
+            length = int(resp.headers.get("Content-Length") or 0) or photo["filesize"] or 0
+            while True:
+                chunk = resp.read(1 << 16)
+                if not chunk:
+                    break
+                fh.write(chunk)
+                done += len(chunk)
+                if task.get("cancel"):
+                    raise yt_dlp.utils.DownloadError("用户已取消下载")
+                task.update(
+                    state="downloading",
+                    percent=round(done / length * 100, 1) if length else None,
+                    speed=done / max(time.time() - started, 0.001),
+                    eta=None, downloaded=done,
+                )
+                _capture_filename(task, {"filename": path})
+        task.update(state="completed", percent=100.0, eta=None, speed=None)
+    except yt_dlp.utils.DownloadError as exc:
+        if task.get("cancel"):
+            task.update(state="cancelled")
+        else:
+            task.update(state="error", error=str(exc).strip() or "快手下载失败")
+        if path and task["state"] != "completed" and os.path.isfile(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    finally:
+        task["ended_at"] = time.time()
+
+
 # ---------- B 站风控自举：官方指纹接口生成 buvid3/buvid4，绕过 412 ----------
 
 _BILI_SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"
@@ -472,9 +621,11 @@ def _normalize_formats(info: dict) -> list[dict]:
 
 def parse_url(url: str) -> dict:
     """提取视频元信息与可选格式列表，不下载。YouTube 风控时自动轮换客户端重试。"""
-    # 小红书走专用引擎：直连笔记页解析 __INITIAL_STATE__（抖音经 cookie 自举后仍走 yt-dlp）
+    # 小红书 / 快手走专用引擎：直连作品页解析（无需 cookies）
     if is_xhs_url(url):
         return _xhs_fetch_note(url)
+    if is_kuaishou_url(url):
+        return _ks_parse(url)
 
     base_opts = {
         "quiet": True,
@@ -485,6 +636,8 @@ def parse_url(url: str) -> dict:
     }
     if JS_RUNTIMES:
         base_opts["js_runtimes"] = JS_RUNTIMES
+    if PROXY:
+        base_opts["proxy"] = PROXY
 
     info, last_exc = None, None
     for client_args in _YT_CLIENT_FALLBACKS:
@@ -562,9 +715,12 @@ def _hook(task_id: str, d: dict):
 def _run_download(task_id: str, url: str, format_id: str | None, audio_only: bool):
     task = _tasks[task_id]
 
-    # 小红书走专用引擎（视频流 / 图集 zip；直链有时效，任务开始时重新解析）
+    # 小红书 / 快手走专用引擎（视频流 / 图集 zip；直链有时效，任务开始时重新解析）
     if is_xhs_url(url):
         _run_xhs_direct(task, url)
+        return
+    if is_kuaishou_url(url):
+        _run_ks_direct(task, url)
         return
 
     if audio_only:
@@ -584,6 +740,8 @@ def _run_download(task_id: str, url: str, format_id: str | None, audio_only: boo
         "windowsfilenames": True,
         "progress_hooks": [lambda d: _hook(task_id, d)],
     }
+    if PROXY:
+        base_opts["proxy"] = PROXY
     if FFMPEG_AVAILABLE and not audio_only:
         base_opts["merge_output_format"] = "mp4"
     if JS_RUNTIMES:
