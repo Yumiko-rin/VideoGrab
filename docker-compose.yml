@@ -1,0 +1,11 @@
+services:
+  videograb:
+    build: .
+    container_name: videograb
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./downloads:/app/downloads
+      # 可选：挂载 cookies 解锁需要登录态的站点（抖音/小红书已免 cookie）
+      # - ./cookies.txt:/app/cookies.txt:ro
+    restart: unless-stopped

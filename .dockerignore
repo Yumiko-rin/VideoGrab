@@ -1,0 +1,16 @@
+.git
+.github
+downloads/
+__pycache__/
+*.pyc
+.venv/
+venv/
+cookies.txt
+*.cookies
+.idea/
+.vscode/
+design-system/
+scripts/
+docs/
+*.md
+!README.md

@@ -30,8 +30,22 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 PARSE_TIMEOUT_SECONDS = 60
 
 URL_PATTERN = re.compile(r"^https?://\S+$", re.IGNORECASE)
+# 分享文案提取：用户常直接粘贴「7.64 复制打开抖音... https://v.douyin.com/xxx/」整段文本
+URL_EXTRACT_RE = re.compile(r"https?://[^\s\"'，。；、！？【】<>]+")
+_URL_TRAIL = ".,;:!?)]}>"
 
-app = FastAPI(title="VideoGrab", version="0.1.0")
+app = FastAPI(title="VideoGrab", version="0.2.0")
+
+
+def extract_url(raw: str) -> str:
+    """从粘贴内容中提取视频链接；本身就是纯链接时原样返回。"""
+    raw = (raw or "").strip()
+    if URL_PATTERN.match(raw):
+        return raw
+    match = URL_EXTRACT_RE.search(raw)
+    if match:
+        return match.group(0).rstrip(_URL_TRAIL)
+    return raw
 
 
 class ParseRequest(BaseModel):
@@ -40,9 +54,9 @@ class ParseRequest(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        v = v.strip()
+        v = extract_url(v)
         if not URL_PATTERN.match(v):
-            raise ValueError("链接格式不正确，需要以 http(s):// 开头")
+            raise ValueError("未在输入中找到有效视频链接（支持直接粘贴分享文案）")
         return v
 
 
@@ -54,9 +68,9 @@ class DownloadRequest(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        v = v.strip()
+        v = extract_url(v)
         if not URL_PATTERN.match(v):
-            raise ValueError("链接格式不正确，需要以 http(s):// 开头")
+            raise ValueError("未在输入中找到有效视频链接")
         return v
 
 

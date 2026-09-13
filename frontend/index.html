@@ -896,8 +896,8 @@ button.text-link { width: auto; }
     <form class="url-form" id="urlForm" novalidate>
       <div class="input-wrap">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        <input class="url-input" id="urlInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
-               placeholder="粘贴视频链接，如 https://www.bilibili.com/video/BV..." aria-describedby="urlHint urlError">
+        <input class="url-input" id="urlInput" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+               placeholder="粘贴视频链接或整段分享文案，支持 Bilibili / YouTube / 抖音 / 小红书 ..." aria-describedby="urlHint urlError">
         <button class="paste-btn" type="button" id="pasteBtn">粘贴</button>
       </div>
       <button class="btn btn-primary" id="parseBtn" type="submit">
@@ -1125,6 +1125,12 @@ function isValidHttpUrl(v) {
   } catch { return false; }
 }
 
+// 分享文案提链：从整段文本（如「7.64 复制打开抖音... https://v.douyin.com/xxx/」）中提取链接
+function extractUrl(text) {
+  const m = String(text || "").match(/https?:\/\/[^\s"'，。；、！？【】<>]+/i);
+  return m ? m[0].replace(/[.,;:!?\)\]>]+$/, "") : "";
+}
+
 function showUrlError(msg) {
   urlError.replaceChildren();
   const icon = svgEl('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', 14);
@@ -1138,10 +1144,10 @@ function clearUrlError() {
   $("#urlHint").hidden = false;
 }
 
-// UX 规则：失焦即校验，不只提交时校验
+// UX 规则：失焦即校验，不只提交时校验（仅当内容看起来是链接时）
 urlInput.addEventListener("blur", () => {
   const v = urlInput.value.trim();
-  if (v && !isValidHttpUrl(v)) showUrlError("链接格式不正确，需要以 http(s):// 开头");
+  if (v && /^https?:\/\//i.test(v) && !isValidHttpUrl(v)) showUrlError("链接格式不正确，需要以 http(s):// 开头");
 });
 urlInput.addEventListener("input", () => { if (!urlError.hidden) clearUrlError(); });
 
@@ -1154,11 +1160,12 @@ $("#pasteBtn").addEventListener("click", async () => {
 
 urlForm.addEventListener("submit", (e) => {
   e.preventDefault();
-  const v = urlInput.value.trim();
-  if (!v) { showUrlError("请先粘贴视频链接"); urlInput.focus(); return; }
-  if (!isValidHttpUrl(v)) { showUrlError("链接格式不正确，需要以 http(s):// 开头"); urlInput.focus(); return; }
+  const raw = urlInput.value.trim();
+  if (!raw) { showUrlError("请先粘贴视频链接或分享文案"); urlInput.focus(); return; }
+  const url = extractUrl(raw);
+  if (!url) { showUrlError("未在文本中找到视频链接（需包含 http(s):// 开头的网址）"); urlInput.focus(); return; }
   clearUrlError();
-  parse(v);
+  parse(url);
 });
 
 function setParsing(busy) {
