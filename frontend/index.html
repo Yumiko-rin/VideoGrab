@@ -1264,6 +1264,7 @@ $("#tabVideo").addEventListener("click", () => setTab("video"));
 $("#tabAudio").addEventListener("click", () => setTab("audio"));
 
 function qualityLabel(f) {
+  if (f.ext === "zip") return `图集${f.images_count ? `·${f.images_count}图` : ""}`;
   if (f.kind === "audio") return f.abr ? `${f.abr}kbps` : (f.ext || "音频").toUpperCase();
   const tier = f.tier || f.height;
   return tier ? `${tier}p` : "未知";

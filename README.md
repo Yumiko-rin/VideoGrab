@@ -32,14 +32,39 @@
 # 1. 安装依赖（建议使用虚拟环境）
 pip install -r requirements.txt
 
-# 2. 启动服务
+# 2. 安装 Chromium（抖音支持需要，一次性下载约 130MB）
+playwright install chromium
+
+# 3. 启动服务
 uvicorn backend.app:app --host 127.0.0.1 --port 8100
 
-# 3. 打开浏览器
+# 4. 打开浏览器
 # http://127.0.0.1:8100
 ```
 
 可选：安装 [ffmpeg](https://ffmpeg.org/download.html) 并加入 PATH，即可解锁 1080p+ 音视频自动合并（Bilibili / YouTube 高清源为分离流，必需）。
+
+## 站点兼容性与 Cookies 配置
+
+| 站点 | 开箱即用 | 说明 |
+|---|---|---|
+| Bilibili | ✅ | 自动调用官方指纹接口生成 buvid3/buvid4 cookie，预防 412 风控 |
+| YouTube | ✅ | 自动探测 node/deno 解签名挑战；风控时自动轮换 tv/ios/android_vr 客户端 |
+| 抖音 | ✅ | Playwright 无头 Chromium 自举会话 cookie（ttwid + s_v_web_id，**无需登录**），yt-dlp 携带后正常解析下载；cookie 缓存 2 小时自动刷新 |
+| 小红书 | ✅ 视频笔记 / 图集 | 专用引擎直连笔记页解析 `__INITIAL_STATE__`（兼容非标准 `undefined` JSON），图集自动打包 zip；私密/需登录笔记请配置 cookies.txt |
+| TikTok / X / 快手 / 微博 / 微信视频号 等 | 视风控而定 | yt-dlp 支持的 1000+ 站点均可使用；个别站点被风控时按下文配置 cookies |
+
+**配置 cookies（任选其一，用于需要登录态的站点）：**
+
+1. **一键脚本（推荐）**：关闭所有 Chrome / Edge 窗口后运行
+   ```bash
+   python scripts/make_cookies.py edge    # 或 chrome
+   ```
+   项目根目录生成 `cookies.txt`，重启即生效（已 gitignore，不会泄露）。
+2. **浏览器扩展导出**：安装 "Get cookies.txt LOCALLY" 扩展，访问目标站点导出 Netscape 格式，保存为项目根目录 `cookies.txt`。
+3. **环境变量**：`set VIDEOGRAB_COOKIES_BROWSER=edge` 后启动服务（读取浏览器需处于关闭状态）。
+
+配置优先级：`cookies.txt` > 环境变量 > 内置自动策略（抖音 ttwid 自动注册）。当前状态可通过 `GET /api/health` 的 `cookies` 字段查看。
 
 ## 在线演示（GitHub Pages）
 
@@ -94,3 +119,4 @@ videograb/
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — 核心解析与下载引擎
 - [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) — 前端设计系统检索
+- [RuiC-VideoGrab](https://github.com/HRuiCcc/RuiC-VideoGrab) — 抖音会话自举、小红书笔记解析与 B 站 buvid 风控自举思路的参考来源

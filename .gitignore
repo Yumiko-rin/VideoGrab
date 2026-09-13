@@ -7,8 +7,14 @@ venv/
 # 下载产物
 downloads/
 
+# Cookies（绝不入库）
+cookies.txt
+.douyin_session.cookies
+.bilibili_bootstrap.cookies
+
 # IDE / OS
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
+*.cookies

@@ -18,6 +18,7 @@ from .downloader import (
     FFMPEG_AVAILABLE,
     JS_RUNTIMES,
     cancel_task,
+    cookies_status,
     get_tasks,
     list_files,
     parse_url,
@@ -65,6 +66,7 @@ async def health():
         "status": "ok",
         "ffmpeg": FFMPEG_AVAILABLE,
         "js_runtime": next(iter(JS_RUNTIMES), "default(deno)"),
+        "cookies": cookies_status(),
         "yt_dlp": yt_dlp.version.__version__,
     }
 
@@ -134,8 +136,9 @@ def _clean_error(raw: str) -> str:
         return "视频不可用（可能已删除、设为私享或地区限制）"
     if "Sign in to confirm" in raw:
         return "YouTube 风控拦截：已自动轮换多个客户端仍被拦，请稍后重试；频繁出现时需为 yt-dlp 配置浏览器 cookies"
-    if "cookies" in raw.lower():
-        return "该站点需要登录才能访问，请为 yt-dlp 配置浏览器 cookies"
+    if "Fresh cookies" in raw or "cookies" in raw.lower():
+        return ("该站点需要浏览器 cookies：在项目根目录放置 cookies.txt（Netscape 格式），"
+                "或设置环境变量 VIDEOGRAB_COOKIES_BROWSER=edge 后重启，配置方法见 README")
     if "is not a valid URL" in raw:
         return "链接格式不正确"
     return raw[:180]
