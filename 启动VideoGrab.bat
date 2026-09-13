@@ -1,55 +1,70 @@
 @echo off
-chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
-title VideoGrab - 视频解析下载器
+title VideoGrab
 
 echo ==============================================
-echo   VideoGrab 快速启动
-echo   关闭本窗口即停止服务
+echo   VideoGrab - local video downloader
+echo   Close this window to stop the server
 echo ==============================================
 echo.
 
-rem ---- 1. 查找 Python ----
+rem ---- 0. Port check: if already running, just open the page ----
+netstat -ano | findstr /R /C:":8100 .*LISTENING" >nul 2>nul
+if not errorlevel 1 (
+    echo [INFO] Port 8100 is already in use. VideoGrab may be running already.
+    echo        - If started before: open http://127.0.0.1:8100 directly
+    echo        - If Docker edition is running: run "docker compose down" first
+    start "" http://127.0.0.1:8100
+    pause
+    exit /b 0
+)
+
+rem ---- 1. Find Python: prefer the official py launcher ----
 set "PY="
-where python >nul 2>nul && set "PY=python"
-if not defined PY where py >nul 2>nul && set "PY=py"
+py -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul && set "PY=py"
 if not defined PY (
-    echo [错误] 未找到 Python，请先安装 Python 3.10+：https://www.python.org/downloads/
+    python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul && set "PY=python"
+)
+if not defined PY (
+    echo [ERROR] Python 3.10+ not found. Install from https://www.python.org/downloads/
     pause
     exit /b 1
 )
+echo [0/3] Python: %PY%
 
-rem ---- 2. 虚拟环境（首次运行自动创建，不污染系统 Python） ----
+rem ---- 2. Virtual env (created on first run, keeps system Python clean) ----
 if not exist ".venv\Scripts\python.exe" (
-    echo [1/3] 首次运行：创建虚拟环境 .venv ...
+    echo [1/3] First run: creating virtual environment .venv ...
     %PY% -m venv .venv
     if errorlevel 1 (
-        echo [错误] 创建虚拟环境失败
+        echo [ERROR] Failed to create virtual environment
         pause
         exit /b 1
     )
 )
 set "VPY=%~dp0.venv\Scripts\python.exe"
 
-rem ---- 3. 安装依赖（已装则跳过） ----
-echo [2/3] 检查依赖 ...
+rem ---- 3. Install dependencies (skipped when present) ----
+echo [2/3] Checking dependencies ...
 "%VPY%" -m pip show fastapi yt-dlp >nul 2>nul
 if errorlevel 1 (
     "%VPY%" -m pip install -r requirements.txt
     if errorlevel 1 (
-        echo [错误] 依赖安装失败，请检查网络后重试
+        echo [ERROR] Dependency installation failed. Check your network and retry.
         pause
         exit /b 1
     )
 )
 
-rem ---- 4. Chromium（抖音支持，已装则秒过） ----
+rem ---- 4. Chromium (needed by Douyin/Kuaishou, fast when cached) ----
 "%VPY%" -m playwright install chromium
 
-rem ---- 5. 启动并打开页面 ----
-echo [3/3] 启动服务：http://127.0.0.1:8100
+rem ---- 5. Start server and open the page ----
+echo [3/3] Starting server: http://127.0.0.1:8100
 echo.
 start "" http://127.0.0.1:8100
 "%VPY%" -m uvicorn backend.app:app --host 127.0.0.1 --port 8100
+echo.
+echo [INFO] Server exited. If there is an error above, screenshot it for feedback.
 pause
