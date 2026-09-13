@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VideoGrab · 粘贴链接，全平台视频一键下载</title>
+<meta name="description" content="基于 yt-dlp 的本地视频解析下载器，支持 Bilibili / YouTube / 抖音 / TikTok 等 1000+ 站点。">
+<meta name="theme-color" content="#F2F3F7">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230A84FF'/%3E%3Cstop offset='1' stop-color='%236366F1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M16 7v11m0 0 4.5-4.5M16 18l-4.5-4.5M9 23h14' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   VideoGrab 设计系统 — 由 ui-ux-pro-max-skill 检索生成
+   风格: Liquid Glass（苹果液态玻璃 · 浅色）
+   详见 design-system/VideoGrab/MASTER.md
+   ============================================================ */
+:root {
+  --color-bg: #F2F3F7;
+  --color-glass: rgba(255, 255, 255, .55);
+  --color-glass-strong: rgba(255, 255, 255, .78);
+  --color-glass-thin: rgba(255, 255, 255, .42);
+  --color-border: rgba(255, 255, 255, .7);
+  --color-hairline: rgba(29, 29, 31, .08);
+  --color-text: #1D1D1F;
+  --color-text-muted: #5C6068;
+  --color-accent: #0071E3;
+  --color-accent-hover: #0077ED;
+  --color-on-accent: #FFFFFF;
+  --color-success: #067647;
+  --color-destructive: #B3261E;
+  --grad-brand: linear-gradient(135deg, #0A84FF 0%, #6366F1 100%);
+  --grad-text: linear-gradient(120deg, #0A84FF 0%, #6366F1 55%, #EC4899 100%);
+  --blur: blur(22px) saturate(180%);
+  --shadow-card: 0 8px 32px rgba(31, 41, 55, .10), inset 0 1px 0 rgba(255, 255, 255, .85);
+  --shadow-float: 0 12px 40px rgba(31, 41, 55, .14), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --glow-accent: rgba(10, 132, 255, .35);
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+  --ease-spring: cubic-bezier(.34, .69, .28, 1);
+  --dur: 260ms;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+/* 液态玻璃的底色：多彩渐变网底，供玻璃层折射 */
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 420px at 8% 2%, rgba(99, 102, 241, .38), transparent 65%),
+    radial-gradient(640px 460px at 96% 8%, rgba(236, 72, 153, .30), transparent 65%),
+    radial-gradient(700px 520px at 12% 96%, rgba(56, 189, 248, .34), transparent 62%),
+    radial-gradient(560px 440px at 90% 94%, rgba(249, 115, 22, .26), transparent 65%),
+    linear-gradient(180deg, rgba(242, 243, 247, .2), rgba(242, 243, 247, .5));
+}
+
+.container {
+  max-width: 760px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+/* 玻璃材质基类 */
+.glass, .card, .nav-pill, .input-wrap, .toast, .file-row, .chip, .tab.active-seg {
+  background: var(--color-glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- 悬浮玻璃导航 ---------- */
+.site-header {
+  position: sticky;
+  top: 14px;
+  z-index: 40;
+  padding: 0 20px;
+}
+
+.header-inner { display: flex; justify-content: center; }
+
+.nav-pill {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--color-glass-strong);
+  box-shadow: var(--shadow-float);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--grad-brand);
+  box-shadow: 0 4px 14px var(--glow-accent), inset 0 1px 0 rgba(255, 255, 255, .4);
+  color: #fff;
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 16.5px;
+  letter-spacing: -.02em;
+}
+
+.header-chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, .12);
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.header-spacer { flex: 1; }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(120, 120, 128, .12);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease-spring), background var(--dur) var(--ease-spring), color var(--dur) var(--ease-spring);
+}
+
+.icon-btn:hover { background: rgba(120, 120, 128, .2); color: var(--color-text); transform: scale(1.06); }
+
+/* ---------- Hero ---------- */
+.hero { padding: 56px 0 10px; text-align: center; }
+
+.hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(30px, 5.4vw, 44px);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -.03em;
+}
+
+.grad-text {
+  background: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-sub {
+  margin: 0 auto 36px;
+  max-width: 56ch;
+  color: var(--color-text-muted);
+  font-size: 16.5px;
+}
+
+/* ---------- URL 表单 ---------- */
+.url-form { display: flex; gap: 12px; }
+
+.input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 8px 0 18px;
+  border-radius: 999px;
+  transition: border-color var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-spring), background var(--dur) var(--ease-spring);
+}
+
+.input-wrap:focus-within {
+  border-color: rgba(10, 132, 255, .7);
+  box-shadow: var(--shadow-card), 0 0 0 4px rgba(10, 132, 255, .14);
+  background: var(--color-glass-strong);
+}
+
+.input-wrap svg { flex: none; color: var(--color-text-muted); }
+
+.url-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 15.5px;
+}
+
+.url-input::placeholder { color: rgba(92, 96, 104, .55); }
+
+.paste-btn {
+  flex: none;
+  padding: 7px 15px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(10, 132, 255, .12);
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-spring), transform var(--dur) var(--ease-spring);
+}
+
+.paste-btn:hover { background: rgba(10, 132, 255, .2); transform: scale(1.04); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 30px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 15.5px;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-spring), background var(--dur) var(--ease-spring), opacity var(--dur) var(--ease-spring);
+}
+
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.paste-btn:focus-visible,
+.tab:focus-visible,
+.fmt:focus-visible,
+.expand-btn:focus-visible,
+.text-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #0A84FF, #0069D9);
+  color: var(--color-on-accent);
+  box-shadow: 0 8px 24px var(--glow-accent), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+.btn-primary:hover { transform: scale(1.03); box-shadow: 0 10px 30px var(--glow-accent), inset 0 1px 0 rgba(255, 255, 255, .35); }
+.btn-primary:active { transform: scale(.98); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.btn[hidden] { display: none; }
+
+.field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 10px 8px 0;
+  color: var(--color-destructive);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.field-error svg { flex: none; margin-top: 2px; }
+
+.field-hint {
+  margin: 10px 8px 0;
+  color: rgba(92, 96, 104, .8);
+  font-size: 13px;
+  text-align: left;
+}
+
+/* 平台 chips：玻璃胶囊 */
+.platform-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  transition: color var(--dur) var(--ease-spring), transform var(--dur) var(--ease-spring), background var(--dur) var(--ease-spring);
+}
+
+.chip:hover { color: var(--color-text); transform: scale(1.05); background: var(--color-glass-strong); }
+
+.chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .04);
+}
+
+.chip-more { border-style: dashed; color: rgba(92, 96, 104, .75); }
+
+/* ---------- 区块通用 ---------- */
+.section { margin-top: 48px; }
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.section-title svg { color: var(--color-accent); }
+
+.card {
+  border-radius: var(--radius-lg);
+}
+
+.hidden { display: none !important; }
+
+/* ---------- 预览卡片 ---------- */
+.preview-card { overflow: hidden; }
+
+.preview-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; padding: 22px; }
+
+.thumb-wrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(120, 120, 128, .12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+
+.thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.thumb-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: rgba(92, 96, 104, .55);
+}
+
+.badge-duration {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(29, 29, 31, .55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font: 500 12px var(--font-mono);
+}
+
+.badge-platform {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .75);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(31, 41, 55, .12);
+}
+
+.badge-platform i { width: 7px; height: 7px; border-radius: 50%; }
+
+.preview-info { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.video-title {
+  margin: 0;
+  font-size: 18.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -.01em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.video-title.expanded { -webkit-line-clamp: unset; }
+
+.expand-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--dur) var(--ease-spring);
+}
+
+.expand-btn:hover { opacity: .75; }
+.expand-btn svg { transition: transform var(--dur) var(--ease-spring); }
+.expand-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+}
+
+.meta-item { display: inline-flex; align-items: center; gap: 6px; }
+
+.meta-item svg { color: rgba(92, 96, 104, .75); }
+
+/* ---------- 分段控件（iOS Segmented Control）---------- */
+.fmt-area { border-top: 1px solid var(--color-hairline); padding: 18px 22px 22px; }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px;
+  margin-bottom: 14px;
+  background: rgba(120, 120, 128, .14);
+  border-radius: 999px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-spring), color var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-spring);
+}
+
+.tab:hover { color: var(--color-text); }
+.tab[aria-pressed="true"] {
+  background: #FFFFFF;
+  color: var(--color-text);
+  box-shadow: 0 2px 10px rgba(31, 41, 55, .16), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+.tab-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(10, 132, 255, .12);
+  color: var(--color-accent);
+  font: 500 11.5px var(--font-mono);
+}
+
+.fmt-list { display: flex; flex-direction: column; gap: 9px; max-height: 320px; overflow-y: auto; padding-right: 6px; }
+
+.fmt-list::-webkit-scrollbar { width: 5px; }
+.fmt-list::-webkit-scrollbar-thumb { background: rgba(120, 120, 128, .3); border-radius: 999px; }
+.fmt-list::-webkit-scrollbar-track { background: transparent; }
+
+.fmt {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: var(--radius-md);
+  background: var(--color-glass-thin);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-spring), background var(--dur) var(--ease-spring), transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-spring);
+}
+
+.fmt:hover {
+  border-color: rgba(255, 255, 255, .9);
+  background: var(--color-glass);
+  transform: scale(1.015);
+  box-shadow: 0 4px 18px rgba(31, 41, 55, .08);
+}
+
+.fmt.selected {
+  border-color: rgba(10, 132, 255, .65);
+  background: rgba(10, 132, 255, .10);
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, .45), 0 4px 18px rgba(10, 132, 255, .12);
+}
+
+.fmt:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.fmt:disabled:hover { border-color: rgba(255, 255, 255, .6); background: var(--color-glass-thin); box-shadow: none; }
+
+.fmt-quality { font-weight: 700; font-size: 15.5px; letter-spacing: -.01em; }
+
+.fmt-fps {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(52, 199, 89, .16);
+  color: var(--color-success);
+  font: 500 11px var(--font-mono);
+  vertical-align: 2px;
+}
+
+.fmt-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--color-text-muted); font-size: 12.5px; }
+
+.fmt-ext {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, .14);
+  color: var(--color-text);
+  font: 500 11.5px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.fmt-progressive {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent);
+  font-size: 11.5px;
+}
+
+.fmt-size { color: var(--color-text); font: 500 13.5px var(--font-mono); }
+
+.fmt-check { color: var(--color-accent); }
+
+.fmt-disabled-note { color: rgba(92, 96, 104, .75); font-size: 11.5px; }
+
+/* 预览底部操作 */
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--color-hairline);
+  padding: 16px 22px;
+}
+
+.selected-summary { flex: 1; min-width: 0; color: var(--color-text-muted); font-size: 13.5px; }
+.selected-summary strong { color: var(--color-text); font-weight: 600; }
+
+/* ---------- 骨架屏 ---------- */
+.skeleton { padding: 22px; display: grid; grid-template-columns: 300px 1fr; gap: 22px; }
+
+.skeleton > div { display: flex; flex-direction: column; gap: 12px; }
+
+.sk {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, rgba(255, 255, 255, .35) 25%, rgba(255, 255, 255, .75) 50%, rgba(255, 255, 255, .35) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.sk-thumb { aspect-ratio: 16 / 9; border-radius: var(--radius-md); }
+.sk-line { height: 14px; }
+.sk-line.w60 { width: 60%; }
+.sk-line.w80 { width: 80%; }
+.sk-line.w40 { width: 40%; }
+
+/* ---------- 任务卡片 ---------- */
+.task-list { display: flex; flex-direction: column; gap: 12px; }
+
+.task-card { padding: 18px 20px; }
+
+.task-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+
+.task-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.state-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.state-chip i { width: 6px; height: 6px; border-radius: 50%; }
+
+.state-downloading { background: rgba(10, 132, 255, .12); color: #0062CC; }
+.state-downloading i { background: #0A84FF; }
+.state-processing { background: rgba(249, 115, 22, .14); color: #B45309; }
+.state-processing i { background: #F97316; }
+.state-completed { background: rgba(52, 199, 89, .16); color: var(--color-success); }
+.state-completed i { background: #30B15C; }
+.state-error { background: rgba(255, 59, 48, .12); color: var(--color-destructive); }
+.state-error i { background: #E0284A; }
+.state-cancelled { background: rgba(120, 120, 128, .12); color: var(--color-text-muted); }
+.state-cancelled i { background: rgba(120, 120, 128, .6); }
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, .18);
+  box-shadow: inset 0 1px 2px rgba(31, 41, 55, .08);
+  overflow: hidden;
+}
+
+.progress > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--grad-brand);
+  transition: width .45s var(--ease-spring);
+  position: relative;
+}
+
+.progress > i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: sweep 1.6s infinite linear;
+}
+
+@keyframes sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.task-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 10px;
+  color: var(--color-text-muted);
+  font: 500 12.5px var(--font-mono);
+}
+
+.task-error {
+  margin-top: 10px;
+  color: var(--color-destructive);
+  font-size: 13px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 已完成文件 ---------- */
+.file-list { display: flex; flex-direction: column; gap: 10px; }
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition: transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-spring), background var(--dur) var(--ease-spring);
+}
+
+.file-row:hover {
+  transform: scale(1.012);
+  background: var(--color-glass-strong);
+  box-shadow: var(--shadow-float);
+}
+
+.file-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: rgba(10, 132, 255, .12);
+  color: var(--color-accent);
+}
+
+.file-info { flex: 1; min-width: 0; }
+
+.file-name {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.file-sub { margin-top: 2px; color: var(--color-text-muted); font: 400 12px var(--font-mono); }
+
+.text-link {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 15px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, .12);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-spring), color var(--dur) var(--ease-spring), transform var(--dur) var(--ease-spring);
+}
+
+.text-link:hover { background: rgba(10, 132, 255, .12); color: var(--color-accent); transform: scale(1.04); }
+
+button.text-link { width: auto; }
+
+.empty-state {
+  padding: 36px 20px;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(120, 120, 128, .35);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.empty-state svg { display: block; margin: 0 auto 10px; opacity: .5; }
+
+/* ---------- Toast：玻璃胶囊 ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(88vw, 560px);
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--color-glass-strong);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: var(--shadow-float);
+  font-size: 14px;
+  transform: translate(-50%, 16px) scale(.96);
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 260ms var(--ease-spring), opacity 260ms var(--ease-spring), visibility 260ms;
+}
+
+.toast.show { transform: translate(-50%, 0) scale(1); opacity: 1; visibility: visible; }
+.toast svg { flex: none; color: var(--color-destructive); }
+
+/* ---------- 页脚 ---------- */
+.site-footer {
+  margin-top: 72px;
+  padding: 26px 0 34px;
+  text-align: center;
+  color: rgba(92, 96, 104, .75);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 720px) {
+  .preview-grid, .skeleton { grid-template-columns: 1fr; }
+  .url-form { flex-direction: column; }
+  .btn-primary { width: 100%; }
+  .header-chip { display: none; }
+  .hero { padding-top: 38px; }
+  .fmt { grid-template-columns: 76px 1fr; }
+  .fmt-size { grid-column: 2; justify-self: start; }
+  .preview-actions { flex-direction: column; align-items: stretch; text-align: center; }
+  .nav-pill { padding: 8px 12px; }
+}
+
+/* ---------- 减弱动态效果 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <nav class="nav-pill" aria-label="主导航">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m16 11-4 4-4-4"/><path d="M5 20h14"/></svg>
+        </span>
+        <span class="brand-name">VideoGrab</span>
+      </a>
+      <span class="header-chip">yt-dlp 驱动 · 1000+ 站点 · 数据不出本机</span>
+      <span class="header-spacer"></span>
+      <a class="icon-btn" href="https://github.com" target="_blank" rel="noopener" aria-label="GitHub 仓库">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <!-- Hero：粘贴链接 -->
+  <section class="hero">
+    <h1>粘贴链接，<span class="grad-text">全平台视频</span>一键下载</h1>
+    <p class="hero-sub">支持 Bilibili、YouTube、抖音、TikTok、X 等 1000+ 站点。解析、选择清晰度、下载全程在本机完成，无需注册与上传。</p>
+
+    <form class="url-form" id="urlForm" novalidate>
+      <div class="input-wrap">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <input class="url-input" id="urlInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+               placeholder="粘贴视频链接，如 https://www.bilibili.com/video/BV..." aria-describedby="urlHint urlError">
+        <button class="paste-btn" type="button" id="pasteBtn">粘贴</button>
+      </div>
+      <button class="btn btn-primary" id="parseBtn" type="submit">
+        <span class="btn-label">开始解析</span>
+        <svg id="parseSpinner" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      </button>
+    </form>
+    <p class="field-error" id="urlError" role="alert" hidden></p>
+    <p class="field-hint" id="urlHint">支持分享短链（b23.tv、youtu.be 等），解析约需 2–10 秒</p>
+
+    <div class="platform-chips" aria-label="支持的平台示例">
+      <span class="chip"><i style="background:#FB7299"></i>Bilibili</span>
+      <span class="chip"><i style="background:#FF0000"></i>YouTube</span>
+      <span class="chip"><i style="background:#FE2C55"></i>抖音</span>
+      <span class="chip"><i style="background:#69C9D0"></i>TikTok</span>
+      <span class="chip"><i style="background:#9CA3AF"></i>X (Twitter)</span>
+      <span class="chip"><i style="background:#FF7900"></i>快手</span>
+      <span class="chip chip-more">等 1000+ 站点</span>
+    </div>
+  </section>
+
+  <!-- 解析结果 -->
+  <section class="section hidden" id="previewSection" aria-label="解析结果">
+    <!-- 骨架屏 -->
+    <div class="card skeleton hidden" id="previewSkeleton" aria-hidden="true">
+      <div class="sk sk-thumb"></div>
+      <div>
+        <div class="sk sk-line w80"></div>
+        <div class="sk sk-line w60"></div>
+        <div class="sk sk-line w40"></div>
+        <div class="sk sk-line w60"></div>
+      </div>
+    </div>
+
+    <div class="card preview-card hidden" id="previewCard">
+      <div class="preview-grid">
+        <div class="thumb-wrap">
+          <img id="thumbImg" alt="" loading="lazy" referrerpolicy="no-referrer" hidden>
+          <div class="thumb-placeholder hidden" id="thumbPlaceholder">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
+          </div>
+          <span class="badge-duration hidden" id="durationBadge"></span>
+          <span class="badge-platform"><i id="platformDot"></i><span id="platformName"></span></span>
+        </div>
+        <div class="preview-info">
+          <h2 class="video-title" id="videoTitle"></h2>
+          <button class="expand-btn" id="titleExpand" aria-expanded="false" hidden>
+            展开全部
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="meta-row">
+            <span class="meta-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span id="uploaderName">未知UP主</span>
+            </span>
+            <span class="meta-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <span id="formatCount">0</span>&nbsp;个可选格式
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fmt-area">
+        <div class="tabs" role="group" aria-label="格式类型">
+          <button class="tab" id="tabVideo" aria-pressed="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
+            视频格式 <span class="tab-count" id="videoCount">0</span>
+          </button>
+          <button class="tab" id="tabAudio" aria-pressed="false">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            仅音频 <span class="tab-count" id="audioCount">0</span>
+          </button>
+        </div>
+        <div class="fmt-list" id="fmtList" role="listbox" aria-label="可选格式"></div>
+        <div class="preview-actions">
+          <span class="selected-summary" id="selectedSummary">未选择格式</span>
+          <button class="btn btn-primary" id="downloadBtn" disabled>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            开始下载
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 下载任务 -->
+  <section class="section hidden" id="tasksSection" aria-label="下载任务">
+    <h2 class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      下载任务
+    </h2>
+    <div class="task-list" id="taskList"></div>
+  </section>
+
+  <!-- 已完成 -->
+  <section class="section hidden" id="filesSection" aria-label="已完成的下载">
+    <h2 class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+      已完成
+    </h2>
+    <div class="file-list" id="fileList"></div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>本工具仅供个人学习与离线备份使用，请尊重原作者版权，勿用于商业传播。</p>
+    <p>Powered by FastAPI · yt-dlp · UI by ui-ux-pro-max design system</p>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ================= 工具函数 ================= */
+const $ = (sel) => document.querySelector(sel);
+
+const PLATFORM_COLORS = {
+  "Bilibili": "#FB7299", "YouTube": "#FF0000", "抖音": "#FE2C55", "TikTok": "#69C9D0",
+  "X (Twitter)": "#9CA3AF", "Instagram": "#E1306C", "快手": "#FF7900", "西瓜视频": "#F04142",
+  "微博": "#E6162D", "Vimeo": "#1AB7EA", "Twitch": "#9146FF", "niconico": "#4B4B4B",
+  "未知站点": "#64748B",
+};
+
+function formatBytes(n) {
+  if (n == null || isNaN(n) || n <= 0) return "未知";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0, v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+function formatSpeed(bps) {
+  if (!bps) return "--";
+  return `${formatBytes(bps)}/s`;
+}
+
+function formatDuration(s) {
+  if (!s && s !== 0) return "";
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const pad = (x) => String(x).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
+function formatEta(s) {
+  if (!s && s !== 0) return "--";
+  if (s >= 3600) return `${Math.floor(s / 3600)}时${Math.floor((s % 3600) / 60)}分`;
+  if (s >= 60) return `${Math.floor(s / 60)}分${Math.round(s % 60)}秒`;
+  return `${Math.round(s)}秒`;
+}
+
+function formatTime(ts) {
+  const d = new Date(ts * 1000);
+  const pad = (x) => String(x).padStart(2, "0");
+  return `${d.getMonth() + 1}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function showToast(msg) {
+  const toast = $("#toast");
+  toast.replaceChildren();
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("width", "16"); icon.setAttribute("height", "16");
+  icon.setAttribute("viewBox", "0 0 24 24"); icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor"); icon.setAttribute("stroke-width", "2");
+  icon.setAttribute("stroke-linecap", "round"); icon.setAttribute("stroke-linejoin", "round");
+  const c1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  c1.setAttribute("cx", "12"); c1.setAttribute("cy", "12"); c1.setAttribute("r", "10");
+  const l1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  l1.setAttribute("x1", "12"); l1.setAttribute("y1", "8"); l1.setAttribute("x2", "12"); l1.setAttribute("y2", "12");
+  const l2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  l2.setAttribute("x1", "12"); l2.setAttribute("y1", "16"); l2.setAttribute("x2", "12.01"); l2.setAttribute("y2", "16");
+  icon.append(c1, l1, l2);
+  toast.append(icon, document.createTextNode(msg));
+  toast.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove("show"), 4000);
+}
+
+function svgEl(pathHtml, size = 16) {
+  const wrap = document.createElement("span");
+  wrap.style.display = "inline-flex";
+  wrap.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${pathHtml}</svg>`;
+  return wrap;
+}
+
+const ICONS = {
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  film: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/>',
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  link: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  cloud: '<path d="M12 13v8"/><path d="m16 17-4-4-4 4"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>',
+};
+
+/* ================= 状态 ================= */
+const state = {
+  info: null,          // 当前解析结果
+  activeTab: "video",  // video | audio
+  selectedId: null,    // 选中的 format_id
+  knownFiles: new Set(), // 用于感知新完成的文件
+};
+
+/* ================= URL 表单 ================= */
+const urlForm = $("#urlForm");
+const urlInput = $("#urlInput");
+const urlError = $("#urlError");
+const parseBtn = $("#parseBtn");
+const parseSpinner = $("#parseSpinner");
+
+function isValidHttpUrl(v) {
+  try {
+    const u = new URL(v.trim());
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch { return false; }
+}
+
+function showUrlError(msg) {
+  urlError.replaceChildren();
+  const icon = svgEl('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', 14);
+  urlError.append(icon, document.createTextNode(msg));
+  urlError.hidden = false;
+  $("#urlHint").hidden = true;
+}
+
+function clearUrlError() {
+  urlError.hidden = true;
+  $("#urlHint").hidden = false;
+}
+
+// UX 规则：失焦即校验，不只提交时校验
+urlInput.addEventListener("blur", () => {
+  const v = urlInput.value.trim();
+  if (v && !isValidHttpUrl(v)) showUrlError("链接格式不正确，需要以 http(s):// 开头");
+});
+urlInput.addEventListener("input", () => { if (!urlError.hidden) clearUrlError(); });
+
+$("#pasteBtn").addEventListener("click", async () => {
+  try {
+    const text = (await navigator.clipboard.readText() || "").trim();
+    if (text) { urlInput.value = text; clearUrlError(); urlInput.focus(); }
+  } catch { urlInput.focus(); }
+});
+
+urlForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = urlInput.value.trim();
+  if (!v) { showUrlError("请先粘贴视频链接"); urlInput.focus(); return; }
+  if (!isValidHttpUrl(v)) { showUrlError("链接格式不正确，需要以 http(s):// 开头"); urlInput.focus(); return; }
+  clearUrlError();
+  parse(v);
+});
+
+function setParsing(busy) {
+  parseBtn.disabled = busy;
+  parseSpinner.classList.toggle("hidden", !busy);
+  parseBtn.querySelector(".btn-label").textContent = busy ? "解析中…" : "开始解析";
+}
+
+/* ================= 解析与预览 ================= */
+async function parse(url) {
+  setParsing(true);
+  const section = $("#previewSection");
+  const skeleton = $("#previewSkeleton");
+  const card = $("#previewCard");
+  section.classList.remove("hidden");
+  skeleton.classList.remove("hidden");
+  card.classList.add("hidden");
+  skeleton.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  try {
+    const res = await fetch("/api/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "解析失败，请稍后重试");
+    state.info = data;
+    state.selectedId = null;
+    renderPreview(data);
+  } catch (err) {
+    // 解析错误就近展示在输入框下方（UX 规则：Error Placement）
+    showUrlError(err.message || "解析失败，请检查链接或网络");
+    if (!$("#previewCard").classList.contains("hidden")) card.classList.add("hidden");
+    skeleton.classList.add("hidden");
+  } finally {
+    setParsing(false);
+  }
+}
+
+function renderPreview(info) {
+  const skeleton = $("#previewSkeleton");
+  const card = $("#previewCard");
+  skeleton.classList.add("hidden");
+  card.classList.remove("hidden");
+
+  // 缩略图
+  const img = $("#thumbImg");
+  const ph = $("#thumbPlaceholder");
+  if (info.thumbnail) {
+    img.src = info.thumbnail;
+    img.hidden = false;
+    ph.classList.add("hidden");
+    img.onerror = () => { img.hidden = true; ph.classList.remove("hidden"); };
+  } else {
+    img.hidden = true;
+    ph.classList.remove("hidden");
+  }
+
+  // 标题（截断 + 展开，UX 规则：Truncation）
+  const title = $("#videoTitle");
+  title.textContent = info.title;
+  title.classList.remove("expanded");
+  const expand = $("#titleExpand");
+  expand.hidden = info.title.length <= 48;
+  expand.setAttribute("aria-expanded", "false");
+
+  // 平台 / 时长 / UP主
+  $("#platformName").textContent = info.platform;
+  $("#platformDot").style.background = PLATFORM_COLORS[info.platform] || "#64748B";
+  const dur = $("#durationBadge");
+  if (info.duration) { dur.textContent = formatDuration(info.duration); dur.classList.remove("hidden"); }
+  else dur.classList.add("hidden");
+  $("#uploaderName").textContent = info.uploader || "未知UP主";
+
+  // 格式列表
+  const videos = info.formats.filter(f => f.kind === "video");
+  const audios = info.formats.filter(f => f.kind === "audio");
+  $("#videoCount").textContent = videos.length;
+  $("#audioCount").textContent = audios.length;
+  $("#formatCount").textContent = info.formats.length;
+
+  setTab("video");
+  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+$("#titleExpand").addEventListener("click", () => {
+  const t = $("#videoTitle");
+  const expanded = t.classList.toggle("expanded");
+  $("#titleExpand").setAttribute("aria-expanded", String(expanded));
+  $("#titleExpand").firstChild.textContent = expanded ? "收起" : "展开全部";
+});
+
+function setTab(tab) {
+  state.activeTab = tab;
+  $("#tabVideo").setAttribute("aria-pressed", String(tab === "video"));
+  $("#tabAudio").setAttribute("aria-pressed", String(tab === "audio"));
+  renderFormats();
+}
+
+$("#tabVideo").addEventListener("click", () => setTab("video"));
+$("#tabAudio").addEventListener("click", () => setTab("audio"));
+
+function qualityLabel(f) {
+  if (f.kind === "audio") return f.abr ? `${f.abr}kbps` : (f.ext || "音频").toUpperCase();
+  return f.height ? `${f.height}p` : "未知";
+}
+
+function renderFormats() {
+  const list = $("#fmtList");
+  const info = state.info;
+  if (!info) return;
+  const fmts = info.formats.filter(f => f.kind === state.activeTab);
+  list.replaceChildren();
+
+  if (!fmts.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.append(svgEl(ICONS[state.activeTab === "video" ? "film" : "music"], 26));
+    empty.append(document.createTextNode("该视频未提供此类型格式"));
+    list.append(empty);
+    updateDownloadBar();
+    return;
+  }
+
+  const bestAudio = info.formats.filter(f => f.kind === "audio")
+    .reduce((a, b) => ((b.filesize || 0) > (a?.filesize || 0) ? b : a), null);
+  const needFfmpeg = (f) => f.kind === "video" && !f.progressive && !info.ffmpeg;
+
+  // 默认选中：视频取最高可用清晰度，音频取最高码率
+  if (!state.selectedId || !fmts.some(f => f.format_id === state.selectedId)) {
+    const firstOk = fmts.find(f => !needFfmpeg(f)) || null;
+    state.selectedId = firstOk ? firstOk.format_id : null;
+  }
+
+  for (const f of fmts) {
+    const disabled = needFfmpeg(f);
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "fmt" + (f.format_id === state.selectedId ? " selected" : "");
+    row.disabled = disabled;
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", String(f.format_id === state.selectedId));
+
+    // 第一列：画质
+    const q = document.createElement("span");
+    q.className = "fmt-quality";
+    q.textContent = qualityLabel(f);
+    if (f.kind === "video" && f.fps >= 50) {
+      const fps = document.createElement("span");
+      fps.className = "fmt-fps";
+      fps.textContent = `${f.fps}fps`;
+      q.append(fps);
+    }
+    if (f.kind === "video" && f.progressive) {
+      const tag = document.createElement("span");
+      tag.className = "fmt-fps";
+      tag.style.background = "rgba(10,132,255,.12)";
+      tag.style.color = "#0062CC";
+      tag.textContent = "含音频";
+      q.append(tag);
+    }
+    row.append(q);
+
+    // 第二列：元信息
+    const meta = document.createElement("span");
+    meta.className = "fmt-meta";
+    const ext = document.createElement("span");
+    ext.className = "fmt-ext";
+    ext.textContent = f.ext || "?";
+    meta.append(ext);
+    if (f.kind === "video") {
+      meta.append(document.createTextNode(`${f.vcodec || "?"}${f.acodec && f.acodec !== "none" ? " + " + f.acodec : ""}`));
+    } else {
+      meta.append(document.createTextNode(f.acodec || "audio"));
+    }
+    if (disabled) {
+      const note = document.createElement("span");
+      note.className = "fmt-disabled-note";
+      note.textContent = "需要 ffmpeg 合并音轨";
+      meta.append(note);
+    }
+    row.append(meta);
+
+    // 第三列：大小 + 选中标记
+    const sizeWrap = document.createElement("span");
+    sizeWrap.className = "fmt-size";
+    let total = f.filesize;
+    if (f.kind === "video" && f.progressive === false && info.ffmpeg && bestAudio) {
+      total = (f.filesize || 0) + (bestAudio.filesize || 0) || null;
+    }
+    sizeWrap.textContent = total ? `≈ ${formatBytes(total)}` : "未知大小";
+    if (f.format_id === state.selectedId) {
+      sizeWrap.append(svgEl(ICONS.check, 15));
+      sizeWrap.style.display = "inline-flex";
+      sizeWrap.style.alignItems = "center";
+      sizeWrap.style.gap = "6px";
+      sizeWrap.style.color = "var(--color-accent)";
+    }
+    row.append(sizeWrap);
+
+    row.addEventListener("click", () => {
+      state.selectedId = f.format_id;
+      renderFormats();
+    });
+    list.append(row);
+  }
+  updateDownloadBar();
+}
+
+function currentSelection() {
+  const info = state.info;
+  if (!info || !state.selectedId) return null;
+  return info.formats.find(f => f.format_id === state.selectedId) || null;
+}
+
+function updateDownloadBar() {
+  const f = currentSelection();
+  const btn = $("#downloadBtn");
+  const summary = $("#selectedSummary");
+  if (!f) {
+    btn.disabled = true;
+    summary.textContent = "未选择格式";
+    return;
+  }
+  btn.disabled = false;
+  const label = f.kind === "audio" ? "仅音频" : `${qualityLabel(f)} ${(f.ext || "").toUpperCase()}`;
+  summary.replaceChildren();
+  summary.append("已选：");
+  const strong = document.createElement("strong");
+  strong.textContent = label;
+  summary.append(strong);
+  summary.append(document.createTextNode(" · 点击右侧按钮开始下载"));
+}
+
+$("#downloadBtn").addEventListener("click", async () => {
+  const info = state.info;
+  const f = currentSelection();
+  if (!info || !f) return;
+  try {
+    const res = await fetch("/api/downloads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: info.webpage_url,
+        format_id: f.format_id,
+        audio_only: f.kind === "audio",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "创建下载任务失败");
+    showToast(`已加入下载队列：${qualityLabel(f)} ${(f.ext || "").toUpperCase()}`);
+    renderTasks(data.tasks || null);
+    startPolling();
+  } catch (err) {
+    showToast(err.message || "创建下载任务失败");
+  }
+});
+
+/* ================= 任务轮询与渲染 ================= */
+const STATE_TEXT = {
+  pending: "排队中", downloading: "下载中", processing: "处理中",
+  completed: "已完成", error: "失败", cancelled: "已取消",
+};
+const STATE_CLASS = {
+  pending: "state-cancelled", downloading: "state-downloading", processing: "state-processing",
+  completed: "state-completed", error: "state-error", cancelled: "state-cancelled",
+};
+
+async function fetchTasks() {
+  try {
+    const res = await fetch("/api/tasks");
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+let pollTimer = null;
+function startPolling() {
+  if (pollTimer) return;
+  $("#tasksSection").classList.remove("hidden");
+  pollTimer = setInterval(poll, 1100);
+  poll();
+}
+
+async function poll() {
+  const tasks = await fetchTasks();
+  renderTasks(tasks);
+  if (!tasks.some(t => ["pending", "downloading", "processing"].includes(t.state))) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function renderTasks(tasks) {
+  if (!tasks) return; // 来自 download 响应的占位，等待下一次 poll
+  const list = $("#taskList");
+  $("#tasksSection").classList.toggle("hidden", tasks.length === 0);
+  list.replaceChildren();
+
+  for (const t of tasks) {
+    const card = document.createElement("div");
+    card.className = "card task-card";
+
+    const head = document.createElement("div");
+    head.className = "task-head";
+    const name = document.createElement("span");
+    name.className = "task-name";
+    name.textContent = t.filename || t.url;
+    name.title = t.filename || t.url;
+    const chip = document.createElement("span");
+    chip.className = `state-chip ${STATE_CLASS[t.state] || "state-cancelled"}`;
+    const dot = document.createElement("i");
+    chip.append(dot, document.createTextNode(STATE_TEXT[t.state] || t.state));
+    head.append(name, chip);
+    card.append(head);
+
+    if (t.state === "error" && t.error) {
+      const errLine = document.createElement("p");
+      errLine.className = "task-error";
+      errLine.textContent = t.error;
+      card.append(errLine);
+    } else if (["pending", "downloading", "processing"].includes(t.state)) {
+      const indeterminate = t.percent == null;
+      const bar = document.createElement("div");
+      bar.className = "progress";
+      const fill = document.createElement("i");
+      fill.style.width = indeterminate ? "100%" : `${Math.min(t.percent, 100)}%`;
+      if (indeterminate) fill.style.opacity = ".4";
+      bar.append(fill);
+      card.append(bar);
+
+      const stats = document.createElement("div");
+      stats.className = "task-stats";
+      const pct = document.createElement("span");
+      pct.textContent = indeterminate ? `已下载 ${formatBytes(t.downloaded || 0)}` : `${(t.percent || 0).toFixed(1)}%`;
+      const speed = document.createElement("span");
+      speed.textContent = t.state === "downloading" ? formatSpeed(t.speed) : "--";
+      const eta = document.createElement("span");
+      eta.textContent = t.state === "downloading" && t.eta != null ? `剩余 ${formatEta(t.eta)}` : "";
+      stats.append(pct, speed, eta);
+      card.append(stats);
+    } else if (t.state === "completed") {
+      const done = document.createElement("div");
+      done.className = "task-stats";
+      done.textContent = "文件已保存到 downloads 目录，可在下方“已完成”中打开";
+      card.append(done);
+    }
+
+    // 取消按钮（进行中任务）
+    if (["pending", "downloading", "processing"].includes(t.state)) {
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "text-link";
+      cancelBtn.style.marginTop = "12px";
+      cancelBtn.append(svgEl(ICONS.x, 13), document.createTextNode("取消任务"));
+      cancelBtn.addEventListener("click", async () => {
+        await fetch(`/api/tasks/${t.task_id}`, { method: "DELETE" });
+        poll();
+      });
+      card.append(cancelBtn);
+    }
+
+    list.append(card);
+  }
+
+  // 任务完成后刷新文件列表
+  const completed = tasks.filter(t => t.state === "completed").length;
+  if (completed > 0) loadFiles();
+}
+
+/* ================= 已完成文件 ================= */
+async function loadFiles() {
+  let files = [];
+  try {
+    const res = await fetch("/api/files");
+    if (res.ok) files = await res.json();
+  } catch { return; }
+  const section = $("#filesSection");
+  const list = $("#fileList");
+  section.classList.toggle("hidden", files.length === 0);
+  list.replaceChildren();
+
+  for (const f of files) {
+    const row = document.createElement("a");
+    row.className = "file-row";
+    row.href = `/files/${encodeURIComponent(f.name)}`;
+    row.target = "_blank";
+    row.rel = "noopener";
+
+    const iconWrap = document.createElement("span");
+    iconWrap.className = "file-icon";
+    const isAudio = /\.(mp3|m4a|aac|opus|ogg|flac|wav|weba)$/i.test(f.name);
+    iconWrap.append(svgEl(isAudio ? ICONS.music : ICONS.film, 18));
+    row.append(iconWrap);
+
+    const info = document.createElement("span");
+    info.className = "file-info";
+    const name = document.createElement("span");
+    name.className = "file-name";
+    name.textContent = f.name;
+    name.title = f.name;
+    const sub = document.createElement("span");
+    sub.className = "file-sub";
+    sub.textContent = `${formatBytes(f.size)} · ${formatTime(f.mtime)}`;
+    info.append(name, sub);
+    row.append(info);
+
+    const open = document.createElement("span");
+    open.className = "text-link";
+    open.append(svgEl(ICONS.link, 13), document.createTextNode("打开"));
+    row.append(open);
+
+    list.append(row);
+  }
+}
+
+/* ================= 初始化 ================= */
+loadFiles();
+</script>
+</body>
+</html>
