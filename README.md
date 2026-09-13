@@ -10,6 +10,8 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white)
 ![yt-dlp](https://img.shields.io/badge/yt--dlp-驱动-0A84FF)
 ![License](https://img.shields.io/badge/License-MIT-6366F1)
+[![Live Demo](https://img.shields.io/badge/在线演示-GitHub_Pages-0A84FF?logo=githubpages)](https://yumiko-rin.github.io/VideoGrab/)
+[![Deploy Pages](https://github.com/Yumiko-rin/VideoGrab/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Yumiko-rin/VideoGrab/actions/workflows/deploy-pages.yml)
 
 </div>
 
@@ -38,6 +40,18 @@ uvicorn backend.app:app --host 127.0.0.1 --port 8100
 ```
 
 可选：安装 [ffmpeg](https://ffmpeg.org/download.html) 并加入 PATH，即可解锁 1080p+ 音视频自动合并（Bilibili / YouTube 高清源为分离流，必需）。
+
+## 在线演示（GitHub Pages）
+
+[https://yumiko-rin.github.io/VideoGrab/](https://yumiko-rin.github.io/VideoGrab/) —— 由 GitHub Actions 在每次 push 到 `main` 时自动发布。
+
+演示站只包含液态玻璃 UI 壳：可以预览交互与视觉，但**不含解析后端**（页面会自动进入演示模式并提示）。解析与下载必须在本机运行后端，原因有三：
+
+1. GitHub Pages 仅支持静态托管，无法运行 FastAPI / yt-dlp；
+2. GitHub 服务条款禁止把 Actions 当作常驻网络服务使用；
+3. 云端数据中心 IP 会稳定触发 YouTube / Bilibili 的机器人风控（本工具的客户端轮换策略只对家宽 IP 有效）。
+
+想要"随时随地访问"的真·部署：在本机运行后 `cloudflared tunnel --url http://127.0.0.1:8100`（内网穿透），或自行容器化部署到 PaaS——后者需要自备 cookies 且注意平台服务条款。
 
 ## 项目结构
 

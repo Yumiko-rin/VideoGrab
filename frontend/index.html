@@ -821,6 +821,27 @@ button.text-link { width: auto; }
   line-height: 1.8;
 }
 
+/* ---------- 演示模式横幅 ---------- */
+.demo-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 28px;
+  padding: 14px 20px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 214, 10, .18);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid rgba(202, 138, 4, .35);
+  color: #713F12;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.demo-banner svg { flex: none; margin-top: 3px; color: #A16207; }
+.demo-banner a { color: var(--color-accent); font-weight: 600; text-decoration: none; }
+.demo-banner a:hover { text-decoration: underline; }
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 720px) {
   .preview-grid, .skeleton { grid-template-columns: 1fr; }
@@ -851,7 +872,7 @@ button.text-link { width: auto; }
 <header class="site-header">
   <div class="container header-inner">
     <nav class="nav-pill" aria-label="主导航">
-      <a class="brand" href="/">
+      <a class="brand" href="./">
         <span class="brand-mark" aria-hidden="true">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m16 11-4 4-4-4"/><path d="M5 20h14"/></svg>
         </span>
@@ -1087,6 +1108,7 @@ const state = {
   activeTab: "video",  // video | audio
   selectedId: null,    // 选中的 format_id
   knownFiles: new Set(), // 用于感知新完成的文件
+  demo: false,         // GitHub Pages 静态演示模式（无后端）
 };
 
 /* ================= URL 表单 ================= */
@@ -1147,6 +1169,7 @@ function setParsing(busy) {
 
 /* ================= 解析与预览 ================= */
 async function parse(url) {
+  if (state.demo) { showToast("演示站不含后端：请按 README 在本机运行后再使用"); return; }
   setParsing(true);
   const section = $("#previewSection");
   const skeleton = $("#previewSkeleton");
@@ -1157,7 +1180,7 @@ async function parse(url) {
   skeleton.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
   try {
-    const res = await fetch("/api/parse", {
+    const res = await fetch("api/parse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
@@ -1381,11 +1404,12 @@ function updateDownloadBar() {
 }
 
 $("#downloadBtn").addEventListener("click", async () => {
+  if (state.demo) { showToast("演示站不含后端：请按 README 在本机运行后再使用"); return; }
   const info = state.info;
   const f = currentSelection();
   if (!info || !f) return;
   try {
-    const res = await fetch("/api/downloads", {
+    const res = await fetch("api/downloads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1416,7 +1440,7 @@ const STATE_CLASS = {
 
 async function fetchTasks() {
   try {
-    const res = await fetch("/api/tasks");
+    const res = await fetch("api/tasks");
     if (!res.ok) return [];
     return await res.json();
   } catch { return []; }
@@ -1501,7 +1525,7 @@ function renderTasks(tasks) {
       cancelBtn.style.marginTop = "12px";
       cancelBtn.append(svgEl(ICONS.x, 13), document.createTextNode("取消任务"));
       cancelBtn.addEventListener("click", async () => {
-        await fetch(`/api/tasks/${t.task_id}`, { method: "DELETE" });
+        await fetch(`api/tasks/${t.task_id}`, { method: "DELETE" });
         poll();
       });
       card.append(cancelBtn);
@@ -1519,7 +1543,7 @@ function renderTasks(tasks) {
 async function loadFiles() {
   let files = [];
   try {
-    const res = await fetch("/api/files");
+    const res = await fetch("api/files");
     if (res.ok) files = await res.json();
   } catch { return; }
   const section = $("#filesSection");
@@ -1530,7 +1554,7 @@ async function loadFiles() {
   for (const f of files) {
     const row = document.createElement("a");
     row.className = "file-row";
-    row.href = `/files/${encodeURIComponent(f.name)}`;
+    row.href = `files/${encodeURIComponent(f.name)}`;
     row.target = "_blank";
     row.rel = "noopener";
 
@@ -1561,14 +1585,47 @@ async function loadFiles() {
   }
 }
 
+/* ================= 演示模式（GitHub Pages 静态站无后端） ================= */
+async function detectDemo() {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2500);
+    const res = await fetch("api/health", { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) return;
+  } catch { /* 请求失败 = 无后端 */ }
+  enableDemoMode();
+}
+
+function enableDemoMode() {
+  state.demo = true;
+  $("#filesSection").classList.add("hidden");
+  const banner = document.createElement("div");
+  banner.className = "demo-banner";
+  banner.setAttribute("role", "note");
+  const icon = svgEl('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', 16);
+  const text = document.createElement("span");
+  text.append("当前是 GitHub Pages 静态演示，界面可预览但不含解析后端。要真正下载视频，请按 ");
+  const link = document.createElement("a");
+  link.href = "https://github.com/Yumiko-rin/VideoGrab#快速开始";
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "README 快速开始";
+  text.append(link);
+  text.append(" 在本机运行。");
+  banner.append(icon, text);
+  document.querySelector("main").prepend(banner);
+}
+
 /* ================= 初始化 ================= */
 $("#openFolderBtn").addEventListener("click", async () => {
   try {
-    const res = await fetch("/api/open-folder", { method: "POST" });
+    const res = await fetch("api/open-folder", { method: "POST" });
     if (!res.ok) throw new Error();
   } catch { showToast("无法打开下载文件夹"); }
 });
 
+detectDemo();
 loadFiles();
 </script>
 </body>
