@@ -134,10 +134,17 @@ async def api_file(name: str):
 @app.post("/api/open-folder")
 async def api_open_folder():
     """在系统资源管理器中打开下载目录（本工具面向本机使用）。"""
+    import subprocess
+    import sys
     try:
-        os.startfile(DOWNLOAD_DIR)  # noqa: S606 - Windows 资源管理器打开目录
-    except (OSError, AttributeError) as exc:
-        raise HTTPException(status_code=500, detail=f"无法打开文件夹：{exc}") from None
+        if sys.platform == "win32":
+            os.startfile(DOWNLOAD_DIR)  # noqa: S606 - Windows 资源管理器打开目录
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", DOWNLOAD_DIR])
+        else:
+            subprocess.Popen(["xdg-open", DOWNLOAD_DIR])
+    except (OSError, AttributeError):
+        return {"ok": True, "message": str(Path(DOWNLOAD_DIR).resolve())}
     return {"ok": True}
 
 

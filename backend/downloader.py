@@ -99,6 +99,16 @@ def is_douyin_url(url: str) -> bool:
     return bool(_DOUYIN_HOST_RE.search(url))
 
 
+def normalize_douyin_url(url: str) -> str:
+    """抖音变体链接归一化：yt-dlp 的 Douyin 提取器只认 /video/<id>。
+    精选页 /jingxuan?modal_id=<id>、个人页弹窗 ?modal_id= 等都携带真实视频 id，
+    重写为标准视频页链接即可解析。"""
+    match = re.search(r"modal_id=(\d{15,})", url)
+    if match:
+        return f"https://www.douyin.com/video/{match.group(1)}"
+    return url
+
+
 def douyin_playwright_available() -> bool:
     try:
         import playwright  # noqa: F401
@@ -626,6 +636,8 @@ def parse_url(url: str) -> dict:
         return _xhs_fetch_note(url)
     if is_kuaishou_url(url):
         return _ks_parse(url)
+    if is_douyin_url(url):
+        url = normalize_douyin_url(url)
 
     base_opts = {
         "quiet": True,
@@ -722,6 +734,8 @@ def _run_download(task_id: str, url: str, format_id: str | None, audio_only: boo
     if is_kuaishou_url(url):
         _run_ks_direct(task, url)
         return
+    if is_douyin_url(url):
+        url = normalize_douyin_url(url)
 
     if audio_only:
         fmt = "bestaudio/best"
